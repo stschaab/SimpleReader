@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>SimpleReader — Война и мир</title>
   <style>
     :root {
@@ -11,10 +11,12 @@
       --card-2: #1c212b;
       --text: #e8e8ea;
       --muted: #9aa0aa;
+      --muted-2: #6b717b;
       --accent: #4f8cff;
       --accent-soft: rgba(79, 140, 255, 0.15);
       --border: #262b35;
       --level: #3a4150;
+      --ok: #2ecc71;
     }
 
     * { box-sizing: border-box; }
@@ -26,208 +28,309 @@
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
         "Microsoft YaHei", "Noto Sans", sans-serif;
-      min-height: 100vh;
+      height: 100dvh;          /* mobil-sicher, berücksichtigt URL-Leiste */
+      overflow: hidden;        /* keine Seiten-Scroll, alles im Rahmen */
+      -webkit-tap-highlight-color: transparent;
     }
 
-    .wrap {
-      max-width: 900px;
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      max-width: 760px;
       margin: 0 auto;
-      padding: 1.5rem 1rem 3rem;
+      padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
     }
 
-    /* --- Buch-Kopf (später: Buchauswahl) --- */
-    .book-head {
+    /* --- Kopf --- */
+    header {
+      padding: 0.9rem 1.1rem 0.6rem;
+      flex-shrink: 0;
+    }
+    .head-row {
       display: flex;
       align-items: baseline;
-      gap: 0.75rem;
+      gap: 0.6rem;
       flex-wrap: wrap;
-      margin-bottom: 1.25rem;
     }
-    .book-head h1 {
+    .head-row h1 {
       margin: 0;
-      font-size: 1.4rem;
+      font-size: 1.15rem;
       letter-spacing: -0.01em;
     }
-    .book-head .author {
+    .head-row .author {
       color: var(--muted);
-      font-size: 0.9rem;
+      font-size: 0.82rem;
     }
-    .badge {
-      padding: 0.2rem 0.6rem;
+    .part {
+      color: var(--muted-2);
+      font-size: 0.76rem;
+      margin: 0.15rem 0 0;
+    }
+
+    /* --- Level-Umschalter --- */
+    .levels {
+      display: flex;
+      gap: 0.4rem;
+      padding: 0.4rem 1.1rem 0.7rem;
+      overflow-x: auto;
+      flex-shrink: 0;
+      scrollbar-width: none;
+    }
+    .levels::-webkit-scrollbar { display: none; }
+
+    .lvl-btn {
+      flex-shrink: 0;
+      padding: 0.45rem 0.9rem;
+      background: var(--card);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+    .lvl-btn:hover { color: var(--text); border-color: var(--muted-2); }
+    .lvl-btn.active {
       background: var(--accent-soft);
       color: var(--accent);
-      border-radius: 999px;
-      font-size: 0.72rem;
-      font-weight: 600;
-      text-transform: uppercase;
+      border-color: var(--accent);
+    }
+
+    /* --- Chunk-Anzeige (zentriert, ohne Scroll) --- */
+    main {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 1.3rem;
+      overflow: hidden;
+    }
+
+    .chunk {
+      max-width: 620px;
+      width: 100%;
+      text-align: left;
+    }
+
+    .chunk-nr {
+      color: var(--muted-2);
+      font-size: 0.78rem;
+      margin-bottom: 0.6rem;
       letter-spacing: 0.04em;
     }
 
-    .part {
-      color: var(--muted);
-      font-size: 0.82rem;
-      margin: -0.5rem 0 1.25rem;
+    .chunk-text {
+      font-size: 1.18rem;
+      line-height: 1.72;
+      color: var(--text);
+      hyphens: auto;
     }
 
-    /* --- Tabelle --- */
-    .table-scroll {
-      overflow-x: auto;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      background: var(--card);
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      min-width: 760px;
-    }
-
-    thead th {
-      background: var(--card-2);
-      color: var(--muted);
-      font-size: 0.78rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      text-align: left;
-      padding: 0.75rem 1rem;
-      border-bottom: 1px solid var(--border);
-      white-space: nowrap;
-    }
-
-    thead th .lvl {
-      display: block;
-      color: var(--accent);
-      font-size: 0.68rem;
-      margin-top: 2px;
-      letter-spacing: 0.02em;
-    }
-
-    tbody td {
-      padding: 1rem;
-      vertical-align: top;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.95rem;
-      line-height: 1.55;
-    }
-    tbody tr:last-child td { border-bottom: none; }
-
-    td.nr {
-      color: var(--muted);
-      font-variant-numeric: tabular-nums;
-      white-space: nowrap;
-    }
-
-    td.original {
-      font-size: 1.02rem;
-      line-height: 1.7;
-    }
-
-    td.empty {
-      color: var(--muted);
+    /* Platzhalter, wenn Level noch leer ist */
+    .placeholder {
       text-align: center;
-      font-size: 0.85rem;
+      color: var(--muted);
+      padding: 2rem 1rem;
     }
-    td.empty .pill {
+    .placeholder .icon {
+      font-size: 2rem;
+      display: block;
+      margin-bottom: 0.6rem;
+      opacity: 0.6;
+    }
+    .placeholder .pill {
       display: inline-block;
-      padding: 0.15rem 0.5rem;
+      padding: 0.2rem 0.7rem;
       background: var(--level);
       border-radius: 6px;
-      opacity: 0.7;
+      font-size: 0.8rem;
+      margin-top: 0.4rem;
     }
 
-    .note {
-      margin-top: 1.25rem;
-      color: var(--muted);
-      font-size: 0.82rem;
-      line-height: 1.5;
+    /* --- Fuß-Navigation --- */
+    footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.7rem 1.1rem 1rem;
+      flex-shrink: 0;
     }
+
+    .nav-btn {
+      min-width: 64px;
+      padding: 0.7rem 1rem;
+      background: var(--card);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.12s ease;
+      font-family: inherit;
+    }
+    .nav-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    .nav-btn:active:not(:disabled) { transform: scale(0.96); }
+    .nav-btn:disabled { opacity: 0.3; cursor: default; }
+
+    .counter {
+      color: var(--muted);
+      font-size: 0.88rem;
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+      flex: 1;
+    }
+    .counter .now { color: var(--text); font-weight: 600; }
   </style>
 </head>
 <body>
-  <main class="wrap">
-    <!-- Buch-Kopf -->
-    <div class="book-head">
-      <span class="badge">SimpleReader</span>
-      <h1 id="book-title">…</h1>
-      <span class="author" id="book-author"></span>
-    </div>
-    <p class="part" id="book-part"></p>
+  <div class="app">
+    <header>
+      <div class="head-row">
+        <h1 id="book-title">…</h1>
+        <span class="author" id="book-author"></span>
+      </div>
+      <p class="part" id="book-part"></p>
+    </header>
 
-    <!-- Text-Tabelle (wird von app.js gefüllt) -->
-    <div class="table-scroll">
-      <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Original <span class="lvl">Русский</span></th>
-            <th>C1</th>
-            <th>B2</th>
-            <th>B1</th>
-            <th>A2</th>
-          </tr>
-        </thead>
-        <tbody id="paragraphs-body">
-          <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem">Lade Text…</td></tr>
-        </tbody>
-      </table>
-    </div>
+    <!-- Level-Umschalter -->
+    <nav class="levels" id="levels"></nav>
 
-    <p class="note" id="source-note"></p>
-  </main>
+    <!-- Chunk-Anzeige -->
+    <main>
+      <div class="chunk">
+        <div class="chunk-nr" id="chunk-nr"></div>
+        <div class="chunk-text" id="chunk-text"></div>
+      </div>
+    </main>
 
-  <!-- Daten und Logik -->
+    <!-- Blättern -->
+    <footer>
+      <button class="nav-btn" id="prev" aria-label="Zurück">‹</button>
+      <div class="counter" id="counter"></div>
+      <button class="nav-btn" id="next" aria-label="Weiter">›</button>
+    </footer>
+  </div>
+
   <script src="data.js"></script>
   <script>
     (function () {
       const book = window.BOOK;
       if (!book) return;
 
+      const LEVELS = ["original", "C1", "B2", "B1", "A2"];
+      const STORAGE_POS = "simplereader.pos";
+      const STORAGE_LVL = "simplereader.lvl";
+
+      // Position & Level aus dem letzten Besuch wiederherstellen (localStorage)
+      let saved = {};
+      try { saved = JSON.parse(localStorage.getItem(STORAGE_POS) || "{}"); } catch (e) {}
+      let idx = Math.min(Math.max(saved.idx || 0, 0), book.paragraphs.length - 1);
+      let level = LEVELS.includes(saved.lvl) ? saved.lvl : "original";
+
       // Kopf füllen
       document.getElementById("book-title").textContent = book.meta.title;
-      document.getElementById("book-author").textContent =
-        book.meta.author + " · " + (book.meta.edition || "");
+      document.getElementById("book-author").textContent = book.meta.author;
       document.getElementById("book-part").textContent = book.meta.part || "";
 
-      // Tabelle füllen
-      const body = document.getElementById("paragraphs-body");
-      body.innerHTML = "";
-
-      book.paragraphs.forEach(function (p) {
-        const tr = document.createElement("tr");
-
-        const tdNr = document.createElement("td");
-        tdNr.className = "nr";
-        tdNr.textContent = p.id;
-        tr.appendChild(tdNr);
-
-        const tdOrig = document.createElement("td");
-        tdOrig.className = "original";
-        tdOrig.textContent = p.original;
-        tr.appendChild(tdOrig);
-
-        ["C1", "B2", "B1", "A2"].forEach(function (lvl) {
-          const td = document.createElement("td");
-          td.className = "empty";
-          if (p[lvl] && p[lvl].trim()) {
-            td.className = "";
-            td.textContent = p[lvl];
-          } else {
-            const pill = document.createElement("span");
-            pill.className = "pill";
-            pill.textContent = "folgt";
-            td.appendChild(pill);
-          }
-          tr.appendChild(td);
-        });
-
-        body.appendChild(tr);
+      // Level-Buttons erzeugen
+      const levelsEl = document.getElementById("levels");
+      LEVELS.forEach(function (lvl) {
+        const b = document.createElement("button");
+        b.className = "lvl-btn";
+        b.dataset.lvl = lvl;
+        b.textContent = lvl === "original" ? "Original" : lvl;
+        b.addEventListener("click", function () { setLevel(lvl); });
+        levelsEl.appendChild(b);
       });
 
-      // Quellenhinweis
-      document.getElementById("source-note").textContent =
-        "Quelle: " + book.meta.source;
+      const textEl = document.getElementById("chunk-text");
+      const nrEl = document.getElementById("chunk-nr");
+      const counterEl = document.getElementById("counter");
+      const prevBtn = document.getElementById("prev");
+      const nextBtn = document.getElementById("next");
+
+      function save() {
+        try { localStorage.setItem(STORAGE_POS, JSON.stringify({ idx: idx, lvl: level })); } catch (e) {}
+      }
+
+      function setLevel(lvl) {
+        level = lvl;
+        Array.prototype.forEach.call(levelsEl.children, function (b) {
+          b.classList.toggle("active", b.dataset.lvl === lvl);
+        });
+        render();
+        save();
+      }
+
+      function go(delta) {
+        const next = idx + delta;
+        if (next < 0 || next >= book.paragraphs.length) return;
+        idx = next;
+        render();
+        save();
+      }
+
+      function render() {
+        const p = book.paragraphs[idx];
+        nrEl.textContent = "Absatz " + (idx + 1) + " / " + book.paragraphs.length;
+
+        // Text oder Platzhalter
+        if (level === "original") {
+          textEl.className = "chunk-text";
+          textEl.textContent = p.original;
+        } else {
+          const val = p[level];
+          if (val && val.trim()) {
+            textEl.className = "chunk-text";
+            textEl.textContent = val;
+          } else {
+            textEl.className = "placeholder";
+            textEl.innerHTML =
+              '<span class="icon">🛠️</span>' +
+              'Vereinfachte Version für Level <strong>' + level + '</strong>' +
+              '<br>folgt demnächst' +
+              '<br><span class="pill">GLM-5.2</span>';
+          }
+        }
+
+        // Zähler
+        counterEl.innerHTML =
+          '<span class="now">' + (idx + 1) + '</span> / ' + book.paragraphs.length;
+
+        // Buttons deaktivieren an den Enden
+        prevBtn.disabled = idx === 0;
+        nextBtn.disabled = idx === book.paragraphs.length - 1;
+      }
+
+      // Events
+      prevBtn.addEventListener("click", function () { go(-1); });
+      nextBtn.addEventListener("click", function () { go(1); });
+
+      // Tastatur (für Desktop-Tests)
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "ArrowLeft") go(-1);
+        else if (e.key === "ArrowRight") go(1);
+      });
+
+      // Wischen (für Handy: links/rechts flippen)
+      let touchX = null;
+      document.addEventListener("touchstart", function (e) {
+        touchX = e.changedTouches[0].clientX;
+      }, { passive: true });
+      document.addEventListener("touchend", function (e) {
+        if (touchX === null) return;
+        const dx = e.changedTouches[0].clientX - touchX;
+        if (Math.abs(dx) > 60) go(dx < 0 ? 1 : -1);
+        touchX = null;
+      }, { passive: true });
+
+      // Start
+      setLevel(level);
+      render();
     })();
   </script>
 </body>
