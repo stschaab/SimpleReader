@@ -31,6 +31,8 @@
       height: 100dvh;          /* mobil-sicher, berücksichtigt URL-Leiste */
       overflow: hidden;        /* keine Seiten-Scroll, alles im Rahmen */
       -webkit-tap-highlight-color: transparent;
+      -webkit-text-size-adjust: 100%;  /* verhindert Samsung-Browser-Skalierung */
+      text-size-adjust: 100%;
     }
 
     .app {
@@ -125,9 +127,11 @@
 
     .chunk-text {
       font-size: 1.6rem;
+      font-size: clamp(1.3rem, 5.5vw, 1.6rem);  /* responsiv, Samsung-kompatibel */
       line-height: 1.72;
       color: var(--text);
       hyphens: auto;
+      -webkit-text-size-adjust: 100%;
     }
     .chunk-text .word {
       cursor: pointer;
@@ -380,10 +384,10 @@
     </div>
   </div>
 
-  <script src="data.js?v=0.12"></script>
+  <script src="data.js?v=0.14"></script>
   <script>
     (function () {
-      const VERSION = "0.13";   // <- ändert sich bei jedem Update -> sichtbar am Handy
+      const VERSION = "0.14";   // <- ändert sich bei jedem Update -> sichtbar am Handy
       const book = window.BOOK;
       if (!book) return;
 
