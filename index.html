@@ -291,7 +291,7 @@
   <script src="data.js?v=0.9"></script>
   <script>
     (function () {
-      const VERSION = "0.9.1";   // <- ändert sich bei jedem Update -> sichtbar am Handy
+      const VERSION = "0.9.2";   // <- ändert sich bei jedem Update -> sichtbar am Handy
       const book = window.BOOK;
       if (!book) return;
 
@@ -460,6 +460,13 @@
         return m ? m[1] : null;
       }
 
+      // Betonungsakzente (Combining Acute, U+0301) entfernen.
+      // Wiktionary liefert Grundformen oft mit Akzent (говори́ть),
+      // aber die Seiten existieren nur ohne Akzent (говорить).
+      function stripAccents(word) {
+        return word.replace(/\u0301/g, "");
+      }
+
       function stripTags(html) {
         const d = document.createElement("div");
         d.innerHTML = html;
@@ -511,18 +518,21 @@
           const defText = stripTags(def0.definition);
 
           // Ist es ein "form-of"-Eintrag? → Grundform extrahieren
-          const lemma = extractLemma(def0.definition);
+          // WICHTIG: aus dem gestrippten Text extrahieren, nicht aus dem Raw-HTML
+          // (das Lemma steckt in <a>/<i> Tags und ist sonst nicht mit Regex greifbar)
+          const lemma = extractLemma(defText);
 
           let gloss = defText;
           let displayLemma = word;
 
           if (lemma && lemma !== word) {
-            // Zweite Abfrage für die echte Übersetzung der Grundform
-            displayLemma = lemma;
+            // Grundform ohne Akzent für die Abfrage (Wiktionary-Seiten sind ohne Akzent)
+            const lemmaClean = stripAccents(lemma);
+            displayLemma = lemmaClean;
             try {
               const url2 =
                 "https://en.wiktionary.org/api/rest_v1/page/definition/" +
-                encodeURIComponent(lemma);
+                encodeURIComponent(lemmaClean);
               const res2 = await fetch(url2);
               if (res2.ok) {
                 const json2 = await res2.json();
