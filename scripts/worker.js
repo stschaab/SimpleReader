@@ -28,34 +28,63 @@ export default {
       const { text, level } = await request.json();
       const prompt = buildPrompt(text, level);
 
-      const glmResponse = await fetch(
-        "https://api.z.ai/api/paas/v4/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + env.GLM_API_KEY,
-          },
-          body: JSON.stringify({
-            model: "glm-4.5-flash",
-            messages: [
-              { role: "system", content: prompt.system },
-              { role: "user", content: prompt.user },
-            ],
-            temperature: 0.3,
-          }),
-        }
-      );
+      // GLM mit automatischer Wiederholung bei Rate-Limit (Code 1302)
+      // bis zu 3 Versuche, mit zunehmender Wartezeit (2s, 4s)
+      let glmData = null;
+      let lastError = null;
 
-      if (!glmResponse.ok) {
-        const errText = await glmResponse.text();
-        return new Response(
-          JSON.stringify({ error: "GLM API error: " + errText }),
-          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) {
+          // Warten vor dem Wiederholungsversuch: 2s, dann 4s
+          await new Promise((r) => setTimeout(r, 2000 * attempt));
+        }
+
+        const glmResponse = await fetch(
+          "https://api.z.ai/api/paas/v4/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer " + env.GLM_API_KEY,
+            },
+            body: JSON.stringify({
+              model: "glm-4.5-flash",
+              messages: [
+                { role: "system", content: prompt.system },
+                { role: "user", content: prompt.user },
+              ],
+              temperature: 0.3,
+            }),
+          }
         );
+
+        if (glmResponse.ok) {
+          glmData = await glmResponse.json();
+          break; // Erfolg
+        }
+
+        const errText = await glmResponse.text();
+        // Rate-Limit? → warten und erneut versuchen
+        if (errText.includes('"code":"1302"') || errText.includes('"code": 1302')) {
+          lastError = "rate-limit";
+          continue; // nächster Versuch
+        }
+        // Anderer Fehler → nicht wiederholen
+        lastError = errText;
+        break;
       }
 
-      const glmData = await glmResponse.json();
+      if (!glmData) {
+        const msg =
+          lastError === "rate-limit"
+            ? "Rate-Limit erreicht, bitte in wenigen Sekunden erneut tippen."
+            : "GLM API error: " + lastError;
+        return new Response(JSON.stringify({ error: msg }), {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const simplified = glmData.choices[0].message.content.trim();
 
       return new Response(JSON.stringify({ simplified }), {
@@ -72,23 +101,26 @@ export default {
 
 function buildPrompt(text, level) {
   const levelGuide = {
-    C1: "C1 (fortgeschritten): Behalte den literarischen Stil und fast den gesamten Wortschatz bei. Glätte nur verschachtelte Sätze leicht, damit sie flüssiger lesbar sind. Moderne Rechtschreibung.",
-    B2: "B2 (Mittelstufe): Löse verschachtelte Sätze in kürzere auf. Ersetze seltene oder veraltete Wörter durch gebräuchlichere. Behalte den Sinn und Ton bei, aber vereinfache die Struktur deutlich.",
+    C1: "C1 (advanced): Keep the literary style and almost all vocabulary. Only slightly smooth nested sentences for better readability. Modern spelling.",
+    B2: "B2 (intermediate): Break nested sentences into shorter ones. Replace rare or archaic words with more common ones. Keep the meaning and tone, but simplify the structure clearly.",
+    B1: "B1 (lower intermediate): Use short, simple sentences. Replace rare words with basic vocabulary. Keep the meaning clear. Reduce complex grammar.",
+    A2: "A2 (elementary): Use very simple sentences and basic vocabulary. Keep only the core meaning. Simple grammar only.",
   };
 
   const guide = levelGuide[level] || levelGuide.B2;
 
   return {
     system:
-      "Du bist ein Experte für russische Sprache und Literatur. " +
-      "Deine Aufgabe ist es, russische Literaturtexte für Deutschsprachige Russisch-Lerner zu vereinfachen. " +
-      "Du gibst AUSSCHLIESSLICH den vereinfachten russischen Text zurück, ohne Erklärungen, ohne Anführungszeichen, ohne Einleitung.",
+      "You are an expert in Russian language and literature. " +
+      "Your task is to SIMPLIFY Russian literary texts for German-speaking Russian learners. " +
+      "CRITICAL: Your output MUST be in RUSSIAN only. Never translate to German or any other language. " +
+      "Return ONLY the simplified Russian text, no explanations, no quotes, no introduction.",
     user:
-      "Vereinfache diesen russischen Text auf Niveau " +
+      "Simplify this Russian text to level " +
       level +
-      ".\n\nRegeln:\n- " +
+      " (CEFR).\n\nRules:\n- " +
       guide +
-      "\n- Behalte Eigennamen bei (Personen, Orte)\n- Gib NUR den vereinfachten Text zurück, nichts anderes\n\nText:\n" +
+      "\n- Keep proper names (people, places)\n- Output MUST be in Russian\n- Return ONLY the simplified Russian text\n\nText:\n" +
       text,
   };
 }
