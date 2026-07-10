@@ -129,6 +129,15 @@
       color: var(--text);
       hyphens: auto;
     }
+    .chunk-text .word {
+      cursor: pointer;
+      border-radius: 4px;
+      -webkit-tap-highlight-color: rgba(79, 140, 255, 0.25);
+      transition: background 0.1s;
+    }
+    .chunk-text .word:active {
+      background: var(--accent-soft);
+    }
 
     /* Platzhalter, wenn Level noch leer ist */
     .placeholder {
@@ -279,10 +288,10 @@
   <!-- Übersetzungs-Pop-up -->
   <div class="dict-popup" id="dict-popup"></div>
 
-  <script src="data.js?v=0.8"></script>
+  <script src="data.js?v=0.9"></script>
   <script>
     (function () {
-      const VERSION = "0.9";   // <- ändert sich bei jedem Update -> sichtbar am Handy
+      const VERSION = "0.9.1";   // <- ändert sich bei jedem Update -> sichtbar am Handy
       const book = window.BOOK;
       if (!book) return;
 
@@ -322,6 +331,17 @@
         try { localStorage.setItem(STORAGE_POS, JSON.stringify({ idx: idx, lvl: level })); } catch (e) {}
       }
 
+      // Wort für klickbar: jedes kyrillische Wort in ein <span> wrappen
+      // Plus Token für Satzzeichen bleibt draußen, um es durchlässig zu machen.
+      function wrapWords(text) {
+        // kyrillische Wörter (mit Akzenten) in spans verpacken
+        return text
+          .replace(/[А-Яа-яЁё]+/g, function (w) {
+            return '<span class="word">' + w + "</span>";
+          })
+          .replace(/&nbsp;/g, "\u00A0");
+      }
+
       function setLevel(lvl) {
         level = lvl;
         Array.prototype.forEach.call(levelsEl.children, function (b) {
@@ -350,12 +370,12 @@
         // Text oder Platzhalter
         if (level === "original") {
           textEl.className = "chunk-text";
-          textEl.textContent = p.original;
+          textEl.innerHTML = wrapWords(p.original);
         } else {
           const val = p[level];
           if (val && val.trim()) {
             textEl.className = "chunk-text";
-            textEl.textContent = val;
+            textEl.innerHTML = wrapWords(val);
           } else {
             textEl.className = "placeholder";
             textEl.innerHTML =
@@ -466,7 +486,16 @@
             "https://en.wiktionary.org/api/rest_v1/page/definition/" +
             encodeURIComponent(word);
           const res = await fetch(url);
-          if (!res.ok) throw new Error("nicht gefunden");
+
+          if (res.status === 404) {
+            // Wort existiert nicht im Wiktionary – KEIN Verbindungsfehler
+            const entry = { notFound: true };
+            dictCache[word] = entry;
+            renderDictEntry(word, entry, x, y);
+            return;
+          }
+          if (!res.ok) throw new Error("HTTP " + res.status);
+
           const json = await res.json();
 
           if (!json.ru || !json.ru.length) {
@@ -515,6 +544,7 @@
           dictCache[word] = entry;
           renderDictEntry(word, entry, x, y);
         } catch (e) {
+          // Echter Netzwerk-/CORS-Fehler
           const entry = { error: true };
           dictCache[word] = entry;
           renderDictEntry(word, entry, x, y);
@@ -547,34 +577,20 @@
         showPopup(html, x, y);
       }
 
-      // Auswahl erkennen (langes Drücken auf Android erzeugt eine Auswahl)
-      document.addEventListener("selectionchange", function () {
-        const sel = window.getSelection();
-        const text = sel.toString().trim();
-        if (!text || text.length < 2 || text.length > 40) {
-          hidePopup();
-          return;
-        }
-        // Nur kyrillische Wörter behandeln
-        if (!/^[А-Яа-яЁё]+$/.test(text)) {
-          hidePopup();
-          return;
-        }
-        // Position der Auswahl ermitteln
-        let x = window.innerWidth / 2,
-          y = window.innerHeight / 2;
-        const range = sel.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
-        if (rect && (rect.left || rect.top)) {
-          x = rect.left + rect.width / 2;
-          y = rect.top;
-        }
-        lookUp(text, x, y);
+      // Klick auf ein Wort → Übersetzung (statt langes Drücken)
+      textEl.addEventListener("click", function (e) {
+        const wordEl = e.target.closest(".word");
+        if (!wordEl) { hidePopup(); return; }
+        const word = wordEl.textContent.trim();
+        const rect = wordEl.getBoundingClientRect();
+        lookUp(word, rect.left + rect.width / 2, rect.top);
       });
 
       // Pop-up schließen beim Tippen daneben oder Blättern
       document.addEventListener("click", function (e) {
-        if (!dictPopup.contains(e.target)) hidePopup();
+        if (!dictPopup.contains(e.target) && !e.target.closest(".word")) {
+          hidePopup();
+        }
       });
       prevBtn.addEventListener("click", hidePopup);
       nextBtn.addEventListener("click", hidePopup);
