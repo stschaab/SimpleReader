@@ -185,6 +185,12 @@
       flex: 1;
     }
     .counter .now { color: var(--text); font-weight: 600; }
+    .counter .ver {
+      display: block;
+      font-size: 0.68rem;
+      color: var(--muted-2);
+      margin-top: 2px;
+    }
   </style>
 </head>
 <body>
@@ -216,9 +222,10 @@
     </footer>
   </div>
 
-  <script src="data.js"></script>
+  <script src="data.js?v=0.6"></script>
   <script>
     (function () {
+      const VERSION = "0.6";   // <- ändert sich bei jedem Update -> sichtbar am Handy
       const book = window.BOOK;
       if (!book) return;
 
@@ -300,7 +307,8 @@
 
         // Zähler
         counterEl.innerHTML =
-          '<span class="now">' + (idx + 1) + '</span> / ' + book.paragraphs.length;
+          '<span class="now">' + (idx + 1) + '</span> / ' + book.paragraphs.length +
+          '<span class="ver">v' + VERSION + '</span>';
 
         // Buttons deaktivieren an den Enden
         prevBtn.disabled = idx === 0;
