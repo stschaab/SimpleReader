@@ -63,6 +63,12 @@
       letter-spacing: 0.04em;
     }
 
+    .part {
+      color: var(--muted);
+      font-size: 0.82rem;
+      margin: -0.5rem 0 1.25rem;
+    }
+
     /* --- Tabelle --- */
     .table-scroll {
       overflow-x: auto;
@@ -74,7 +80,7 @@
     table {
       width: 100%;
       border-collapse: collapse;
-      min-width: 760px; /* sorgt für horizontales Scrollen auf Mobil */
+      min-width: 760px;
     }
 
     thead th {
@@ -118,7 +124,6 @@
       line-height: 1.7;
     }
 
-    /* Platzhalter für künftige Level */
     td.empty {
       color: var(--muted);
       text-align: center;
@@ -144,12 +149,13 @@
   <main class="wrap">
     <!-- Buch-Kopf -->
     <div class="book-head">
-      <span class="badge">SimpleReader · Leseprobe</span>
-      <h1>Война и мир</h1>
-      <span class="author">Лев Толстой · 1869</span>
+      <span class="badge">SimpleReader</span>
+      <h1 id="book-title">…</h1>
+      <span class="author" id="book-author"></span>
     </div>
+    <p class="part" id="book-part"></p>
 
-    <!-- Text-Tabelle -->
+    <!-- Text-Tabelle (wird von app.js gefüllt) -->
     <div class="table-scroll">
       <table>
         <thead>
@@ -162,29 +168,67 @@
             <th>A2</th>
           </tr>
         </thead>
-        <tbody>
-          <tr>
-            <td class="nr">1</td>
-            <!-- Platzhalter-Text: wird später aus der echten EPUB geladen -->
-            <td class="original">
-              В начале июля 1805 года знаменитая Анна Павловна Шерер, фрейлина и
-              приближенная императрицы Марии Фёдоровны, желала видеть у себя в
-              первый раз столь важное лицо, как князь Василий Курагин.
-            </td>
-            <td class="empty"><span class="pill">folgt</span></td>
-            <td class="empty"><span class="pill">folgt</span></td>
-            <td class="empty"><span class="pill">folgt</span></td>
-            <td class="empty"><span class="pill">folgt</span></td>
-          </tr>
+        <tbody id="paragraphs-body">
+          <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem">Lade Text…</td></tr>
         </tbody>
       </table>
     </div>
 
-    <p class="note">
-      Demo-Inhalt: eine Textzeile aus dem Eröffnungskapitel. Die exakten Texte
-      werden später automatisch aus der EPUB-Datei geladen. Die Level-Spalten
-      (C1/B2/B1/A2) werden mit den GLM-5.2-Vereinfachungen gefüllt.
-    </p>
+    <p class="note" id="source-note"></p>
   </main>
+
+  <!-- Daten und Logik -->
+  <script src="data.js"></script>
+  <script>
+    (function () {
+      const book = window.BOOK;
+      if (!book) return;
+
+      // Kopf füllen
+      document.getElementById("book-title").textContent = book.meta.title;
+      document.getElementById("book-author").textContent =
+        book.meta.author + " · " + (book.meta.edition || "");
+      document.getElementById("book-part").textContent = book.meta.part || "";
+
+      // Tabelle füllen
+      const body = document.getElementById("paragraphs-body");
+      body.innerHTML = "";
+
+      book.paragraphs.forEach(function (p) {
+        const tr = document.createElement("tr");
+
+        const tdNr = document.createElement("td");
+        tdNr.className = "nr";
+        tdNr.textContent = p.id;
+        tr.appendChild(tdNr);
+
+        const tdOrig = document.createElement("td");
+        tdOrig.className = "original";
+        tdOrig.textContent = p.original;
+        tr.appendChild(tdOrig);
+
+        ["C1", "B2", "B1", "A2"].forEach(function (lvl) {
+          const td = document.createElement("td");
+          td.className = "empty";
+          if (p[lvl] && p[lvl].trim()) {
+            td.className = "";
+            td.textContent = p[lvl];
+          } else {
+            const pill = document.createElement("span");
+            pill.className = "pill";
+            pill.textContent = "folgt";
+            td.appendChild(pill);
+          }
+          tr.appendChild(td);
+        });
+
+        body.appendChild(tr);
+      });
+
+      // Quellenhinweis
+      document.getElementById("source-note").textContent =
+        "Quelle: " + book.meta.source;
+    })();
+  </script>
 </body>
 </html>
