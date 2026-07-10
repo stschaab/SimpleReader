@@ -99,14 +99,15 @@
       border-color: var(--accent);
     }
 
-    /* --- Chunk-Anzeige (zentriert, ohne Scroll) --- */
+    /* --- Chunk-Anzeige (zentriert, scrollbar falls nötig) --- */
     main {
       flex: 1;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 0 1.3rem;
-      overflow: hidden;
+      overflow-y: auto;        /* Scroll, falls ein Chunk zu groß ist */
+      -webkit-overflow-scrolling: touch;
     }
 
     .chunk {
@@ -316,16 +317,29 @@
         else if (e.key === "ArrowRight") go(1);
       });
 
-      // Wischen (für Handy: links/rechts flippen)
-      let touchX = null;
+      // Wischen (für Handy: nur horizontale Wischer blättern,
+      // vertikale Wischer scrollen lassen, ohne zu flippen)
+      let touchStartX = null;
+      let touchStartY = null;
+      let swipeActive = false;
       document.addEventListener("touchstart", function (e) {
-        touchX = e.changedTouches[0].clientX;
+        touchStartX = e.changedTouches[0].clientX;
+        touchStartY = e.changedTouches[0].clientY;
+        swipeActive = true;
+      }, { passive: true });
+      document.addEventListener("touchmove", function (e) {
+        if (!swipeActive || touchStartX === null) return;
+        const dx = Math.abs(e.changedTouches[0].clientX - touchStartX);
+        const dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
+        // Wenn die Vertikalbewegung deutlicher ist, Flippen abbrechen → scrollen lassen
+        if (dy > dx && dy > 12) swipeActive = false;
       }, { passive: true });
       document.addEventListener("touchend", function (e) {
-        if (touchX === null) return;
-        const dx = e.changedTouches[0].clientX - touchX;
+        if (!swipeActive || touchStartX === null) { swipeActive = false; return; }
+        const dx = e.changedTouches[0].clientX - touchStartX;
         if (Math.abs(dx) > 60) go(dx < 0 ? 1 : -1);
-        touchX = null;
+        swipeActive = false;
+        touchStartX = null;
       }, { passive: true });
 
       // Start
