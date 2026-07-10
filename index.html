@@ -222,10 +222,10 @@
     </footer>
   </div>
 
-  <script src="data.js?v=0.6"></script>
+  <script src="data.js?v=0.7"></script>
   <script>
     (function () {
-      const VERSION = "0.6";   // <- ändert sich bei jedem Update -> sichtbar am Handy
+      const VERSION = "0.7";   // <- ändert sich bei jedem Update -> sichtbar am Handy
       const book = window.BOOK;
       if (!book) return;
 
@@ -284,7 +284,11 @@
 
       function render() {
         const p = book.paragraphs[idx];
-        nrEl.textContent = "Absatz " + (idx + 1) + " / " + book.paragraphs.length;
+        // Chapter-Referenz anzeigen (falls vorhanden), sonst nur Nummer
+        const ref = p.bookRef
+          ? p.bookRef + "  ·  Absatz " + (idx + 1) + " / " + book.paragraphs.length
+          : "Absatz " + (idx + 1) + " / " + book.paragraphs.length;
+        nrEl.textContent = ref;
 
         // Text oder Platzhalter
         if (level === "original") {
