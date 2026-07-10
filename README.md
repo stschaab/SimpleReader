@@ -1,53 +1,17 @@
-# DeepSeeq — E-Book Reader
+# SimpleReader — E-Book Reader
 
-HTML-basierter E-Book-Reader für russische Bücher (z.B. «Krieg und Frieden»).
-Kern-Features (geplant): EPUB-Anzeige, Text-Vereinfachung per Slider über GLM-5.2,
-Übersetzung Russisch ↔ Chinesisch, Authing (Google Login).
+HTML-basierter E-Book-Reader für russische Bücher (z.B. «Война и мир» von Tolstoi).
+Text-Vereinfachung in Sprachniveaus (C1/B2/B1/A2) über GLM-5.2, Übersetzung
+Russisch ↔ Chinesisch.
 
 ---
 
-## 🚀 Hello World live stellen
+## 🚀 Online stellen
 
-Dieses Repo enthält aktuell nur `index.html` – eine Demo-Seite, die zeigt,
-dass das Deployment funktioniert.
+Dieses Repo wird über **GitHub Pages** veröffentlicht (aus Russland zuverlässig
+erreichbar, im Gegensatz zu EdgeOne/Tencent, die russische IPs blockieren).
 
-### Variante A — EdgeOne Pages (empfohlen, am schnellsten)
-
-EdgeOne Pages ist wirklich kostenlos und braucht **keine Kontoverifizierung**.
-
-**Ohne CLI (Drag & Drop):**
-1. Öffne <https://pages.edgeone.ai/drop>
-2. Ziehe `index.html` dorthin (oder kopiere den Inhalt hinein)
-3. Sofort online – du bekommst eine öffentliche URL
-
-**Mit CLI (skriptbar):**
-```bash
-# CLI installieren (siehe https://pages.edgeone.ai/document/edgeone-cli)
-# Dann aus dem Projektordner:
-edgeone pages deploy ./
-```
-
-### Variante B — CloudBase (für später, wenn Backend dazukommt)
-
-CloudBase brauchen wir für **Datenbank + Cloud Function (GLM-Proxy)**. Das
-statische Hosting läuft dort auch, ist aber quota-basiert und benötigt eine
-verifizierte Tencent-Cloud-Konto.
-
-```bash
-# 1. CLI installieren
-npm install -g @cloudbase/cli@latest
-
-# 2. Login (öffnet Browser)
-tcb login
-
-# 3. In der Konsole eine Umgebung anlegen (Region + 按量计费/pay-as-you-go),
-#    envId kopieren, statisches Hosting aktivieren
-
-# 4. Deploy
-tcb hosting deploy ./ -e <dein-envId>
-```
-
-Danach erreichbar unter `https://<envId>.tcloudbaseapp.com`.
+URL nach dem Deploy: `https://stschaab.github.io/simplereader/`
 
 ---
 
@@ -55,21 +19,22 @@ Danach erreichbar unter `https://<envId>.tcloudbaseapp.com`.
 
 | Schicht | Produkt | Zweck |
 |---------|---------|-------|
-| Frontend (statisch) | EdgeOne Pages | Reader-UI |
-| Backend (BaaS) | CloudBase | DB + Cloud Functions |
-| KI-Proxy | CloudBase Cloud Function | GLM-5.2-Aufruf mit geschütztem API-Key |
-| Auth | Authing | Google Login |
-| Hosting Frontend | EdgeOne Pages | globales Edge-CDN |
+| Frontend (statisch) | GitHub Pages | Reader-UI |
+| KI-Modell | GLM-5.2 (Z.ai) | Vereinfachung & Übersetzung |
+| KI-Aufruf | Proxy (später) | geschützter API-Key |
+
+EdgeOne / CloudBase (Tencent) waren ursprünglich geplant, sind aber aus
+Russland blockiert. Falls später gewünscht, kann das Hosting nach DE migriert werden.
 
 ---
 
-## ✅ Checkliste für die nächsten Schritte
+## ✅ Checkliste
 
-- [ ] Hello World auf EdgeOne Pages live (Variante A)
-- [ ] CloudBase-Umgebung anlegen + envId notieren
-- [ ] Cloud Function als GLM-5.2-Proxy bauen
-- [ ] DB-Schema (`books`, `paragraphs`, `translations`, `users`) anlegen
-- [ ] EPUB-Parser + Absatz-Anzeige im Frontend
-- [ ] Slider pro Absatz → Vereinfachung
+- [ ] GitHub-Repo `simplereader` anlegen
+- [ ] Code pushen & GitHub Pages aktivieren
+- [ ] EPUB-Parser + Absatz-Anzeige
+- [ ] Flip-Navigation (ein Chunk pro Fenster, ohne Scrollen)
+- [ ] Level-Umschalter C1/B2/B1/A2
+- [ ] GLM-5.2 Vereinfachung
 - [ ] Übersetzung Russisch ↔ Chinesisch
-- [ ] Authing (Google Login) integrieren
+- [ ] Buchauswahl
