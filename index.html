@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DeepSeeq — E-Book Reader</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --card: #171a21;
+      --text: #e8e8ea;
+      --muted: #9aa0aa;
+      --accent: #4f8cff;
+      --accent-soft: rgba(79, 140, 255, 0.15);
+      --border: #262b35;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Microsoft YaHei", "Noto Sans", sans-serif;
+      min-height: 100vh;
+    }
+
+    .wrap {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 4rem 1.5rem;
+      text-align: center;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.3rem 0.8rem;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 6vw, 3rem);
+      margin: 1.5rem 0 0.5rem;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 1.1rem;
+      margin: 0 0 2.5rem;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 2rem;
+      text-align: left;
+    }
+
+    .card h2 {
+      margin-top: 0;
+      font-size: 1.1rem;
+      color: var(--text);
+    }
+
+    .card p {
+      color: var(--muted);
+      line-height: 1.6;
+      margin: 0.5rem 0;
+    }
+
+    .ru {
+      font-size: 1.15rem;
+      color: var(--text);
+      font-style: italic;
+    }
+
+    .status {
+      margin-top: 2rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: #2ecc71;
+      border-radius: 50%;
+      margin-right: 0.4rem;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <span class="badge">Hello World</span>
+    <h1>DeepSeeq</h1>
+    <p class="subtitle">HTML-basierter E-Book-Reader für russische Literatur</p>
+
+    <div class="card">
+      <h2>Привет, мир! <span style="color:var(--muted);font-weight:400;font-size:.9rem">— Probe-Absatz</span></h2>
+      <p class="ru">«Все счастливые семьи похожи друг на друга, каждая несчастливая семья несчастлива по-своему.»</p>
+      <p>Это первая страница вашего будущего читателя. Bald: EPUB laden, Slider-Vereinfachung &amp; Russisch ↔ Chinesisch Übersetzung.</p>
+    </div>
+
+    <p class="status"><span class="dot"></span>Demo live auf EdgeOne Pages · Backend folgt über CloudBase</p>
+  </main>
+</body>
+</html>
