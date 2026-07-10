@@ -159,6 +159,10 @@
       font-size: 0.8rem;
       margin-top: 0.4rem;
     }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
 
     /* --- Übersetzungs-Pop-up --- */
     .dict-popup {
@@ -288,10 +292,10 @@
   <!-- Übersetzungs-Pop-up -->
   <div class="dict-popup" id="dict-popup"></div>
 
-  <script src="data.js?v=0.9"></script>
+  <script src="data.js?v=0.10"></script>
   <script>
     (function () {
-      const VERSION = "0.9.2";   // <- ändert sich bei jedem Update -> sichtbar am Handy
+      const VERSION = "0.10";   // <- ändert sich bei jedem Update -> sichtbar am Handy
       const book = window.BOOK;
       if (!book) return;
 
@@ -342,6 +346,57 @@
           .replace(/&nbsp;/g, "\u00A0");
       }
 
+      // Ad-hoc Vereinfachung über Cloudflare Worker → GLM-5.2
+      // Cache: Key = chunkId + ":" + level → vereinfachter Text
+      const WORKER_URL = "https://bitter-bush-c665.st-schaab.workers.dev/";
+      const adHocCache = {};
+
+      function renderAdHoc(p, lvl) {
+        const cacheKey = p.id + ":" + lvl;
+
+        // 1. Bereits gecacht? → sofort anzeigen
+        if (adHocCache[cacheKey]) {
+          textEl.className = "chunk-text";
+          textEl.innerHTML = wrapWords(adHocCache[cacheKey]);
+          return;
+        }
+
+        // 2. Ladeanzeige
+        textEl.className = "placeholder";
+        textEl.innerHTML =
+          '<span class="icon" style="display:inline-block;animation:spin 1s linear infinite">⚙️</span>' +
+          'Generiere <strong>' + lvl + '</strong>-Vereinfachung…' +
+          '<br><span style="font-size:0.8rem;color:var(--muted-2)">GLM-5.2 · ca. 5 Sekunden</span>';
+
+        // 3. Worker aufrufen
+        fetch(WORKER_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json; charset=utf-8" },
+          body: JSON.stringify({ text: p.original, level: lvl }),
+        })
+          .then(function (res) { return res.json(); })
+          .then(function (data) {
+            if (data.error) throw new Error(data.error);
+            const simplified = data.simplified.trim();
+            adHocCache[cacheKey] = simplified;  // cachen
+            // Nur anzeigen, wenn wir noch auf demselben Chunk+Level sind
+            if (book.paragraphs[idx].id === p.id && level === lvl) {
+              textEl.className = "chunk-text";
+              textEl.innerHTML = wrapWords(simplified);
+            }
+          })
+          .catch(function (err) {
+            if (book.paragraphs[idx].id === p.id && level === lvl) {
+              textEl.className = "placeholder";
+              textEl.innerHTML =
+                '<span class="icon">⚠️</span>' +
+                'Fehler bei der Generierung.' +
+                '<br><span style="font-size:0.8rem;color:var(--muted-2)">' + err.message + '</span>' +
+                '<br><br><span style="font-size:0.75rem;color:var(--muted-2)">Nochmal auf ' + lvl + ' tippen zum Wiederholen</span>';
+            }
+          });
+      }
+
       function setLevel(lvl) {
         level = lvl;
         Array.prototype.forEach.call(levelsEl.children, function (b) {
@@ -374,15 +429,12 @@
         } else {
           const val = p[level];
           if (val && val.trim()) {
+            // Vorgefertigte Vereinfachung vorhanden
             textEl.className = "chunk-text";
             textEl.innerHTML = wrapWords(val);
           } else {
-            textEl.className = "placeholder";
-            textEl.innerHTML =
-              '<span class="icon">🛠️</span>' +
-              'Vereinfachte Version für Level <strong>' + level + '</strong>' +
-              '<br>folgt demnächst' +
-              '<br><span class="pill">GLM-5.2</span>';
+            // Keine Vorgabe → ad-hoc über Worker anfordern (GLM-5.2)
+            renderAdHoc(p, level);
           }
         }
 
