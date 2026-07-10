@@ -151,6 +151,60 @@
       margin-top: 0.4rem;
     }
 
+    /* --- Übersetzungs-Pop-up --- */
+    .dict-popup {
+      position: fixed;
+      z-index: 100;
+      background: var(--card-2);
+      border: 1px solid var(--accent);
+      border-radius: 12px;
+      padding: 0.9rem 1.1rem;
+      max-width: 300px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      font-size: 0.95rem;
+      display: none;
+    }
+    .dict-popup.visible { display: block; }
+    .dict-popup .dw {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.3rem;
+    }
+    .dict-popup .lemma {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .dict-popup .inflected {
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+    .dict-popup .pos {
+      color: var(--muted-2);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.3rem;
+    }
+    .dict-popup .gloss {
+      color: var(--text);
+      line-height: 1.45;
+    }
+    .dict-popup .loading {
+      color: var(--muted);
+      font-style: italic;
+    }
+    .dict-popup .err {
+      color: var(--muted);
+    }
+    .dict-popup .close-hint {
+      color: var(--muted-2);
+      font-size: 0.7rem;
+      margin-top: 0.5rem;
+    }
+
     /* --- Fuß-Navigation --- */
     footer {
       display: flex;
@@ -222,10 +276,13 @@
     </footer>
   </div>
 
+  <!-- Übersetzungs-Pop-up -->
+  <div class="dict-popup" id="dict-popup"></div>
+
   <script src="data.js?v=0.8"></script>
   <script>
     (function () {
-      const VERSION = "0.8";   // <- ändert sich bei jedem Update -> sichtbar am Handy
+      const VERSION = "0.9";   // <- ändert sich bei jedem Update -> sichtbar am Handy
       const book = window.BOOK;
       if (!book) return;
 
@@ -353,6 +410,174 @@
         swipeActive = false;
         touchStartX = null;
       }, { passive: true });
+
+      // ─── Wörterbuch / Wort-Übersetzung ───
+      // Wird aktiviert, wenn der Nutzer ein Wort markiert (lange drücken auf Android)
+      const dictPopup = document.getElementById("dict-popup");
+      const dictCache = {}; // Wort → Ergebnis (verhindert Doppel-Anfragen)
+
+      function showPopup(html, x, y) {
+        dictPopup.innerHTML = html;
+        dictPopup.classList.add("visible");
+        // Position: nahe der Auswahl, aber im viewport halten
+        const pw = dictPopup.offsetWidth || 280;
+        const ph = dictPopup.offsetHeight || 100;
+        let left = Math.max(10, Math.min(x - pw / 2, window.innerWidth - pw - 10));
+        let top = y - ph - 16; // über der Auswahl
+        if (top < 10) top = y + 30; // wenn kein Platz oben, dann darunter
+        dictPopup.style.left = left + "px";
+        dictPopup.style.top = top + "px";
+      }
+
+      function hidePopup() {
+        dictPopup.classList.remove("visible");
+      }
+
+      // Grundform aus "form-of"-Eintrag extrahieren
+      function extractLemma(html) {
+        // Muster: "...singular of князь (knjazʹ)" → князь
+        const m = html.match(/of\s+([А-Яа-яЁё][А-Яа-яЁё]*(?:́[А-Яа-яЁё]+)?)/);
+        return m ? m[1] : null;
+      }
+
+      function stripTags(html) {
+        const d = document.createElement("div");
+        d.innerHTML = html;
+        return d.textContent || d.innerText || "";
+      }
+
+      async function lookUp(word, x, y) {
+        word = word.trim().replace(/[^А-Яа-яЁё]/g, "");
+        if (!word || word.length < 2) return;
+
+        showPopup(
+          '<div class="loading">Suche „' + word + "“…</div>",
+          x, y
+        );
+
+        // Cache prüfen
+        if (dictCache[word]) {
+          renderDictEntry(word, dictCache[word], x, y);
+          return;
+        }
+
+        try {
+          const url =
+            "https://en.wiktionary.org/api/rest_v1/page/definition/" +
+            encodeURIComponent(word);
+          const res = await fetch(url);
+          if (!res.ok) throw new Error("nicht gefunden");
+          const json = await res.json();
+
+          if (!json.ru || !json.ru.length) {
+            const entry = { notFound: true };
+            dictCache[word] = entry;
+            renderDictEntry(word, entry, x, y);
+            return;
+          }
+
+          const section = json.ru[0]; // erste Wortart
+          const pos = section.partOfSpeech || "";
+          const def0 = section.definitions[0];
+          const defText = stripTags(def0.definition);
+
+          // Ist es ein "form-of"-Eintrag? → Grundform extrahieren
+          const lemma = extractLemma(def0.definition);
+
+          let gloss = defText;
+          let displayLemma = word;
+
+          if (lemma && lemma !== word) {
+            // Zweite Abfrage für die echte Übersetzung der Grundform
+            displayLemma = lemma;
+            try {
+              const url2 =
+                "https://en.wiktionary.org/api/rest_v1/page/definition/" +
+                encodeURIComponent(lemma);
+              const res2 = await fetch(url2);
+              if (res2.ok) {
+                const json2 = await res2.json();
+                if (json2.ru && json2.ru[0] && json2.ru[0].definitions[0]) {
+                  gloss = stripTags(json2.ru[0].definitions[0].definition);
+                }
+              }
+            } catch (e) {
+              // Zweite Abfrage fehlgeschlagen → form-of-Text behalten
+            }
+          }
+
+          const entry = {
+            lemma: displayLemma,
+            pos: pos,
+            gloss: gloss,
+            inflected: lemma && lemma !== word ? word : null,
+          };
+          dictCache[word] = entry;
+          renderDictEntry(word, entry, x, y);
+        } catch (e) {
+          const entry = { error: true };
+          dictCache[word] = entry;
+          renderDictEntry(word, entry, x, y);
+        }
+      }
+
+      function renderDictEntry(word, entry, x, y) {
+        let html;
+        if (entry.notFound) {
+          html =
+            '<div class="dw"><span class="lemma">' + word + "</span></div>" +
+            '<div class="err">Nicht im Wörterbuch gefunden.</div>';
+        } else if (entry.error) {
+          html =
+            '<div class="err">Verbindungsfehler. Bitte später erneut.</div>';
+        } else {
+          html = '<div class="dw">';
+          html += '<span class="lemma">' + entry.lemma + "</span>";
+          if (entry.inflected) {
+            html +=
+              '<span class="inflected">(von „' + entry.inflected + "“)</span>";
+          }
+          html += "</div>";
+          if (entry.pos) {
+            html += '<div class="pos">' + entry.pos + "</div>";
+          }
+          html += '<div class="gloss">' + entry.gloss + "</div>";
+        }
+        html += '<div class="close-hint">Tippe daneben zum Schließen</div>';
+        showPopup(html, x, y);
+      }
+
+      // Auswahl erkennen (langes Drücken auf Android erzeugt eine Auswahl)
+      document.addEventListener("selectionchange", function () {
+        const sel = window.getSelection();
+        const text = sel.toString().trim();
+        if (!text || text.length < 2 || text.length > 40) {
+          hidePopup();
+          return;
+        }
+        // Nur kyrillische Wörter behandeln
+        if (!/^[А-Яа-яЁё]+$/.test(text)) {
+          hidePopup();
+          return;
+        }
+        // Position der Auswahl ermitteln
+        let x = window.innerWidth / 2,
+          y = window.innerHeight / 2;
+        const range = sel.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        if (rect && (rect.left || rect.top)) {
+          x = rect.left + rect.width / 2;
+          y = rect.top;
+        }
+        lookUp(text, x, y);
+      });
+
+      // Pop-up schließen beim Tippen daneben oder Blättern
+      document.addEventListener("click", function (e) {
+        if (!dictPopup.contains(e.target)) hidePopup();
+      });
+      prevBtn.addEventListener("click", hidePopup);
+      nextBtn.addEventListener("click", hidePopup);
 
       // Start
       setLevel(level);
