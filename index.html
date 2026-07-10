@@ -292,10 +292,10 @@
   <!-- Übersetzungs-Pop-up -->
   <div class="dict-popup" id="dict-popup"></div>
 
-  <script src="data.js?v=0.11"></script>
+  <script src="data.js?v=0.12"></script>
   <script>
     (function () {
-      const VERSION = "0.11";   // <- ändert sich bei jedem Update -> sichtbar am Handy
+      const VERSION = "0.12";   // <- ändert sich bei jedem Update -> sichtbar am Handy
       const book = window.BOOK;
       if (!book) return;
 
@@ -366,14 +366,14 @@
         textEl.innerHTML =
           '<span class="icon" style="display:inline-block;animation:spin 1s linear infinite">⚙️</span>' +
           'Generiere <strong>' + lvl + '</strong>-Vereinfachung…' +
-          '<br><span style="font-size:0.8rem;color:var(--muted-2)">GLM-5.2 · ca. 5 Sekunden</span>';
+          '<br><span style="font-size:0.8rem;color:var(--muted-2)">GLM-5.2 · kann bis zu 30 Sekunden dauern</span>';
 
-        // 3. Worker aufrufen
-        fetch(WORKER_URL, {
+        // 3. Worker aufrufen, mit Timeout (60s) und Wiederholung bei Netzwerkfehler
+        fetchWithTimeout(WORKER_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json; charset=utf-8" },
           body: JSON.stringify({ text: p.original, level: lvl }),
-        })
+        }, 60000)
           .then(function (res) { return res.json(); })
           .then(function (data) {
             if (data.error) throw new Error(data.error);
@@ -388,13 +388,33 @@
           .catch(function (err) {
             if (book.paragraphs[idx].id === p.id && level === lvl) {
               textEl.className = "placeholder";
+              const msg = err.message === "Timeout"
+                ? "Zeitüberschreitung – GLM braucht gerade zu lange."
+                : (err.message || "Netzwerkfehler");
               textEl.innerHTML =
                 '<span class="icon">⚠️</span>' +
                 'Fehler bei der Generierung.' +
-                '<br><span style="font-size:0.8rem;color:var(--muted-2)">' + err.message + '</span>' +
+                '<br><span style="font-size:0.8rem;color:var(--muted-2)">' + msg + '</span>' +
                 '<br><br><span style="font-size:0.75rem;color:var(--muted-2)">Nochmal auf ' + lvl + ' tippen zum Wiederholen</span>';
             }
           });
+      }
+
+      // fetch mit Timeout: bricht nach ms Millisekunden ab
+      function fetchWithTimeout(url, options, ms) {
+        return new Promise(function (resolve, reject) {
+          const controller = new AbortController();
+          const timer = setTimeout(function () {
+            controller.abort();
+            reject(new Error("Timeout"));
+          }, ms);
+          fetch(url, Object.assign({ signal: controller.signal }, options))
+            .then(function (res) { clearTimeout(timer); resolve(res); })
+            .catch(function (err) {
+              clearTimeout(timer);
+              reject(err);
+            });
+        });
       }
 
       function setLevel(lvl) {

@@ -29,14 +29,14 @@ export default {
       const prompt = buildPrompt(text, level);
 
       // GLM mit automatischer Wiederholung bei Rate-Limit (Code 1302)
-      // bis zu 3 Versuche, mit zunehmender Wartezeit (2s, 4s)
+      // bis zu 2 Versuche (Original + 1 Wiederholung), kurze Pause
       let glmData = null;
       let lastError = null;
 
-      for (let attempt = 0; attempt < 3; attempt++) {
+      for (let attempt = 0; attempt < 2; attempt++) {
         if (attempt > 0) {
-          // Warten vor dem Wiederholungsversuch: 2s, dann 4s
-          await new Promise((r) => setTimeout(r, 2000 * attempt));
+          // Kurz warten vor dem Wiederholungsversuch (1s)
+          await new Promise((r) => setTimeout(r, 1000));
         }
 
         const glmResponse = await fetch(
