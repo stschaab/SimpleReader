@@ -259,6 +259,50 @@
       font-family: inherit;
       -webkit-tap-highlight-color: transparent;
     }
+
+    /* --- Text-to-Speech --- */
+    .tts-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.3rem 1.1rem 0.5rem;
+      flex-shrink: 0;
+    }
+    .tts-btn {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 0.4rem 0.7rem;
+      font-size: 1.1rem;
+      cursor: pointer;
+      font-family: inherit;
+      -webkit-tap-highlight-color: transparent;
+      transition: all 0.12s;
+    }
+    .tts-btn:hover { border-color: var(--accent); }
+    .tts-btn.playing {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .tts-speed {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+    .tts-speed input[type="range"] {
+      width: 80px;
+      accent-color: var(--accent);
+    }
+    .tts-speed .val {
+      min-width: 28px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
+    }
     .diag-overlay {
       position: fixed;
       inset: 0;
@@ -359,6 +403,16 @@
       </div>
     </main>
 
+    <!-- Text-to-Speech -->
+    <div class="tts-bar">
+      <button class="tts-btn" id="tts-btn" aria-label="Vorlesen">🔊</button>
+      <div class="tts-speed">
+        <span>Tempo</span>
+        <input type="range" id="tts-rate" min="0.5" max="1.5" step="0.05" value="0.8" />
+        <span class="val" id="tts-rate-val">0.8×</span>
+      </div>
+    </div>
+
     <!-- Blättern -->
     <footer>
       <button class="nav-btn" id="prev" aria-label="Zurück">‹</button>
@@ -384,10 +438,10 @@
     </div>
   </div>
 
-  <script src="data.js?v=0.16"></script>
+  <script src="data.js?v=0.17"></script>
   <script>
     (function () {
-      const VERSION = "0.16";   // <- ändert sich bei jedem Update -> sichtbar am Handy
+      const VERSION = "0.17";   // <- ändert sich bei jedem Update -> sichtbar am Handy
       const book = window.BOOK;
       if (!book) return;
 
@@ -536,6 +590,7 @@
         Array.prototype.forEach.call(levelsEl.children, function (b) {
           b.classList.toggle("active", b.dataset.lvl === lvl);
         });
+        if (typeof stopTTS === "function") stopTTS();
         render();
         save();
       }
@@ -892,6 +947,84 @@
           lastResult3.textContent = "3/3  A2 fehlgeschlagen ✗\n" + e.message;
         }
       });
+
+      // ─── Text-to-Speech ───
+      const ttsBtn = document.getElementById("tts-btn");
+      const ttsRate = document.getElementById("tts-rate");
+      const ttsRateVal = document.getElementById("tts-rate-val");
+      let ttsSpeaking = false;
+      let ttsPaused = false;
+
+      // Verfügbare russische Stimme finden
+      let ruVoice = null;
+      function loadVoices() {
+        const voices = window.speechSynthesis.getVoices();
+        ruVoice = voices.find(function (v) { return v.lang === "ru-RU"; }) ||
+                 voices.find(function (v) { return v.lang && v.lang.startsWith("ru"); });
+      }
+      loadVoices();
+      if (window.speechSynthesis) {
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+      }
+
+      ttsRate.addEventListener("input", function () {
+        ttsRateVal.textContent = parseFloat(ttsRate.value).toFixed(2) + "×";
+      });
+
+      function stopTTS() {
+        if (window.speechSynthesis) window.speechSynthesis.cancel();
+        ttsSpeaking = false;
+        ttsPaused = false;
+        ttsBtn.classList.remove("playing");
+        ttsBtn.textContent = "🔊";
+      }
+
+      ttsBtn.addEventListener("click", function () {
+        if (!window.speechSynthesis) {
+          alert("Sprachausgabe wird von diesem Browser nicht unterstützt.");
+          return;
+        }
+
+        // Wenn gerade spricht → pausieren/fortsetzen/stoppen
+        if (ttsSpeaking) {
+          if (ttsPaused) {
+            window.speechSynthesis.resume();
+            ttsPaused = false;
+            ttsBtn.textContent = "⏸";
+          } else {
+            window.speechSynthesis.pause();
+            ttsPaused = true;
+            ttsBtn.textContent = "▶";
+          }
+          return;
+        }
+
+        // Aktuellen Text holen
+        const p = book.paragraphs[idx];
+        let text = p.original;
+        if (level !== "original" && p[level] && p[level].trim()) {
+          text = p[level];
+        }
+
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = "ru-RU";
+        if (ruVoice) utter.voice = ruVoice;
+        utter.rate = parseFloat(ttsRate.value);
+
+        utter.onend = function () { stopTTS(); };
+        utter.onerror = function () { stopTTS(); };
+
+        window.speechSynthesis.speak(utter);
+        ttsSpeaking = true;
+        ttsPaused = false;
+        ttsBtn.classList.add("playing");
+        ttsBtn.textContent = "⏸";
+      });
+
+      // Beim Blättern oder Levelwechsel → Stimme stoppen
+      prevBtn.addEventListener("click", stopTTS);
+      nextBtn.addEventListener("click", stopTTS);
+      // setLevel um stopTTS erweitern
 
       // Start
       setLevel(level);
