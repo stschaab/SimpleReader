@@ -438,10 +438,10 @@
     </div>
   </div>
 
-  <script src="data.js?v=0.17"></script>
+  <script src="data.js?v=0.18"></script>
   <script>
     (function () {
-      const VERSION = "0.17";   // <- ändert sich bei jedem Update -> sichtbar am Handy
+      const VERSION = "0.18";   // <- ändert sich bei jedem Update -> sichtbar am Handy
       const book = window.BOOK;
       if (!book) return;
 
@@ -985,6 +985,9 @@
           return;
         }
 
+        // Stimme ggf. neu laden (iOS lädt verzögert)
+        if (!ruVoice) loadVoices();
+
         // Wenn gerade spricht → pausieren/fortsetzen/stoppen
         if (ttsSpeaking) {
           if (ttsPaused) {
@@ -999,6 +1002,17 @@
           return;
         }
 
+        // Warnung, wenn keine russische Stimme installiert
+        if (!ruVoice) {
+          alert(
+            "Keine russische Stimme gefunden!\n\n" +
+            "Bitte installieren:\n" +
+            "• Android: Einstellungen → Spracheingabe → TTS → Russisch\n" +
+            "• iPhone: Einstellungen → Bedienungshilfen → Gesprochene Inhalte → Stimmen → Russisch"
+          );
+          return;
+        }
+
         // Aktuellen Text holen
         const p = book.paragraphs[idx];
         let text = p.original;
@@ -1008,8 +1022,10 @@
 
         const utter = new SpeechSynthesisUtterance(text);
         utter.lang = "ru-RU";
-        if (ruVoice) utter.voice = ruVoice;
+        utter.voice = ruVoice;
         utter.rate = parseFloat(ttsRate.value);
+        utter.volume = 1;
+        utter.pitch = 1;
 
         utter.onend = function () { stopTTS(); };
         utter.onerror = function () { stopTTS(); };
