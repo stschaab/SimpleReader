@@ -303,6 +303,22 @@
       font-variant-numeric: tabular-nums;
       color: var(--text);
     }
+    .tts-autoplay {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--muted);
+      font-size: 0.82rem;
+      cursor: pointer;
+      user-select: none;
+    }
+    .tts-autoplay input {
+      accent-color: var(--accent);
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+    .tts-autoplay.active { color: var(--accent); }
     .diag-overlay {
       position: fixed;
       inset: 0;
@@ -411,6 +427,10 @@
         <input type="range" id="tts-rate" min="0.5" max="1.5" step="0.05" value="0.8" />
         <span class="val" id="tts-rate-val">0.8×</span>
       </div>
+      <label class="tts-autoplay" id="tts-autoplay-label">
+        <input type="checkbox" id="tts-autoplay" />
+        <span>▶ Autoplay</span>
+      </label>
     </div>
 
     <!-- Blättern -->
@@ -438,10 +458,10 @@
     </div>
   </div>
 
-  <script src="data.js?v=0.18"></script>
+  <script src="data.js?v=0.19"></script>
   <script>
     (function () {
-      const VERSION = "0.18";   // <- ändert sich bei jedem Update -> sichtbar am Handy
+      const VERSION = "0.19";   // <- ändert sich bei jedem Update -> sichtbar am Handy
       const book = window.BOOK;
       if (!book) return;
 
@@ -952,6 +972,8 @@
       const ttsBtn = document.getElementById("tts-btn");
       const ttsRate = document.getElementById("tts-rate");
       const ttsRateVal = document.getElementById("tts-rate-val");
+      const ttsAutoplay = document.getElementById("tts-autoplay");
+      const ttsAutoplayLabel = document.getElementById("tts-autoplay-label");
       let ttsSpeaking = false;
       let ttsPaused = false;
 
@@ -971,6 +993,66 @@
         ttsRateVal.textContent = parseFloat(ttsRate.value).toFixed(2) + "×";
       });
 
+      // Startet das Vorlesen für den aktuellen Chunk+Level.
+      // autoplay: true wenn durch Autoplay ausgelöst (unterdrückt Voice-Warnung)
+      function startTTS(autoplay) {
+        // Stimme ggf. neu laden (iOS lädt verzögert)
+        if (!ruVoice) loadVoices();
+
+        if (!ruVoice) {
+          if (!autoplay) {
+            alert(
+              "Keine russische Stimme gefunden!\n\n" +
+              "Bitte installieren:\n" +
+              "• Android: Einstellungen → Spracheingabe → TTS → Russisch\n" +
+              "• iPhone: Einstellungen → Bedienungshilfen → Gesprochene Inhalte → Stimmen → Russisch"
+            );
+          }
+          return false;
+        }
+
+        const p = book.paragraphs[idx];
+        let text = p.original;
+        if (level !== "original" && p[level] && p[level].trim()) {
+          text = p[level];
+        }
+
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = "ru-RU";
+        utter.voice = ruVoice;
+        utter.rate = parseFloat(ttsRate.value);
+        utter.volume = 1;
+        utter.pitch = 1;
+
+        utter.onend = function () {
+          ttsSpeaking = false;
+          ttsPaused = false;
+          ttsBtn.classList.remove("playing");
+          ttsBtn.textContent = "🔊";
+
+          // Autoplay: nächsten Chunk laden und vorlesen
+          if (ttsAutoplay.checked && idx < book.paragraphs.length - 1) {
+            setTimeout(function () {
+              go(1);
+              setTimeout(function () { startTTS(true); }, 300);
+            }, 500);
+          }
+        };
+        utter.onerror = function () {
+          ttsSpeaking = false;
+          ttsPaused = false;
+          ttsBtn.classList.remove("playing");
+          ttsBtn.textContent = "🔊";
+        };
+
+        window.speechSynthesis.speak(utter);
+        ttsSpeaking = true;
+        ttsPaused = false;
+        ttsBtn.classList.add("playing");
+        ttsBtn.textContent = "⏸";
+        return true;
+      }
+
       function stopTTS() {
         if (window.speechSynthesis) window.speechSynthesis.cancel();
         ttsSpeaking = false;
@@ -984,9 +1066,6 @@
           alert("Sprachausgabe wird von diesem Browser nicht unterstützt.");
           return;
         }
-
-        // Stimme ggf. neu laden (iOS lädt verzögert)
-        if (!ruVoice) loadVoices();
 
         // Wenn gerade spricht → pausieren/fortsetzen/stoppen
         if (ttsSpeaking) {
@@ -1002,39 +1081,12 @@
           return;
         }
 
-        // Warnung, wenn keine russische Stimme installiert
-        if (!ruVoice) {
-          alert(
-            "Keine russische Stimme gefunden!\n\n" +
-            "Bitte installieren:\n" +
-            "• Android: Einstellungen → Spracheingabe → TTS → Russisch\n" +
-            "• iPhone: Einstellungen → Bedienungshilfen → Gesprochene Inhalte → Stimmen → Russisch"
-          );
-          return;
-        }
+        startTTS(false);
+      });
 
-        // Aktuellen Text holen
-        const p = book.paragraphs[idx];
-        let text = p.original;
-        if (level !== "original" && p[level] && p[level].trim()) {
-          text = p[level];
-        }
-
-        const utter = new SpeechSynthesisUtterance(text);
-        utter.lang = "ru-RU";
-        utter.voice = ruVoice;
-        utter.rate = parseFloat(ttsRate.value);
-        utter.volume = 1;
-        utter.pitch = 1;
-
-        utter.onend = function () { stopTTS(); };
-        utter.onerror = function () { stopTTS(); };
-
-        window.speechSynthesis.speak(utter);
-        ttsSpeaking = true;
-        ttsPaused = false;
-        ttsBtn.classList.add("playing");
-        ttsBtn.textContent = "⏸";
+      // Autoplay-Checkbox: visuelles Feedback
+      ttsAutoplay.addEventListener("change", function () {
+        ttsAutoplayLabel.classList.toggle("active", ttsAutoplay.checked);
       });
 
       // Beim Blättern oder Levelwechsel → Stimme stoppen
